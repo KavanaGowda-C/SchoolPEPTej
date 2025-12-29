@@ -10,11 +10,19 @@ import com.nimblix.SchoolPEPProject.Request.ClassroomRequest;
 import com.nimblix.SchoolPEPProject.Request.TeacherRegistrationRequest;
 import com.nimblix.SchoolPEPProject.Response.TeacherDetailsResponse;
 import com.nimblix.SchoolPEPProject.Service.TeacherService;
+import com.nimblix.SchoolPEPProject.Repository.AttachmentsRepository;
+
+import org.springframework.core.io.Resource;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -243,6 +251,64 @@ public class TeacherServiceImpl implements TeacherService {
                 "Assignment shared successfully with students");
 
         return response;
+    }
+
+    //-------------Download Assignment Attachment Service Implementation ----------------
+    private final TaskRepository taskRepository;
+    private final AttachmentsRepository attachmentsRepository;
+
+    @Override
+    public ResponseEntity<org.springframework.core.io.Resource>
+    downloadAssignmentAttachment(
+            Long assignmentId,
+            Long attachmentId,
+            Long userId
+    ) {
+
+        // assignmentId is ACTUALLY taskId internally
+        Task task = taskRepository.findById(assignmentId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+
+        boolean isTeacher = task.getUserId() != null && task.getUserId().equals(userId);
+
+        if (!isTeacher) {
+            throw new RuntimeException("Access denied");
+        }
+
+        Attachments attachment = attachmentsRepository
+                .findByIdAndTask_Id(attachmentId, assignmentId)
+                .orElseThrow(() -> new RuntimeException("Attachment not found"));
+
+        File file = new File(attachment.getFileUrl());
+        if (!file.exists()) {
+            throw new RuntimeException("File not found");
+        }
+
+        try {
+            org.springframework.core.io.Resource resource =
+                    new org.springframework.core.io.UrlResource(file.toURI());
+
+            return ResponseEntity.ok()
+                    .contentType(resolveMediaType(attachment.getFileName()))
+                    .header(
+                            HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + attachment.getFileName() + "\""
+                    )
+                    .body(resource);
+
+        } catch (java.net.MalformedURLException e) {
+            throw new RuntimeException("Invalid file path", e);
+        }
+    }
+
+
+    private MediaType resolveMediaType(String fileName) {
+        if (fileName.endsWith(".pdf")) return MediaType.APPLICATION_PDF;
+        if (fileName.endsWith(".png")) return MediaType.IMAGE_PNG;
+        if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg"))
+            return MediaType.IMAGE_JPEG;
+
+        return MediaType.APPLICATION_OCTET_STREAM;
     }
 
 }
