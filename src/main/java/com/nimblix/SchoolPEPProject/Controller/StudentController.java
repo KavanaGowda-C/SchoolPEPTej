@@ -13,6 +13,7 @@ import com.nimblix.SchoolPEPProject.Request.StudentRegistrationRequest;
 import com.nimblix.SchoolPEPProject.Response.StudentDetailsResponse;
 import com.nimblix.SchoolPEPProject.Service.StudentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
